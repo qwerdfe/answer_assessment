@@ -1,0 +1,41 @@
+import pandas as pd
+from sqlalchemy import create_engine
+
+
+print("python script start....")
+
+engine = create_engine('postgresql://candidate:NW337AkNQH76veGc@technical-test-1.cncti7m4kr9f.ap-south-1.rds.amazonaws.com:5432/technical_test')
+df_trades = pd.read_sql_query("select * from trades",engine)
+trades_expected_values = {'cmd':[0,1],'digits':[0,1,2,3,4,5]}
+for column,expected in trades_expected_values.items():
+    unexpected_values = df_trades[~df_trades[column].isin(expected)]
+    if not unexpected_values.empty:
+        print('unexpected values in column:{0}, the value is {1}.'.format(column,unexpected_values[column]))
+
+unexpected_volume=df_trades[(df_trades['volume'].astype(int)<=0)]
+if not unexpected_volume.empty:
+    print('unexpected values in column:volume, the value is {0}.'.format(unexpected_volume['volume']))
+
+unexpected_open_price=df_trades[(df_trades['open_price'].astype(float)<=0)]
+if not unexpected_open_price.empty:
+    print('unexpected values in column:open_price, the value is {0}.'.format(unexpected_open_price['open_price']))
+
+unexpected_contractsize=df_trades[(df_trades['contractsize'].astype(float)<=0) | (df_trades['contractsize'].isnull())]
+if not unexpected_contractsize.empty:
+    print('unexpected values in column:open_price, the value is {0}.'.format(unexpected_contractsize['contractsize']))
+
+df_trades['time_diff'] = df_trades['close_time'] - df_trades['open_time']
+if (df_trades['time_diff'] <= pd.Timedelta(0)).any():
+    print("The columns of below where 'close_time' is not greater than 'open_time'")
+    print(df_trades[df_trades['time_diff'] <= pd.Timedelta(0)][['close_time','open_time']])
+
+df_users = pd.read_sql_query("select * from users",engine)
+users_expected_values = {'enable':[0,1]}
+for column,expected in users_expected_values.items():
+    unexpected_values = df_users[~df_users[column].isin(expected)]
+    if not unexpected_values.empty:
+        print('unexpected values in column:{0}, the value is {1}.'.format(column,unexpected_values[column]))
+
+joined_df=df_trades.merge(df_users,how='left',on=['login_hash','server_hash'])
+if joined_df.isnull().any().any():
+    print("There are null values after the join")
